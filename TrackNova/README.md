@@ -1,15 +1,15 @@
 # TrackNova
 
-**Object-Specific Movement Detection and Tracking Using Video Datasets**
+**TrackNova (Object Tracking & Motion Intelligence)**
 
 > **See Every Movement. Track Every Object.**  
-> *AI-Powered Object Tracking & Motion Intelligence*
+> **Object-Specific Movement Detection and Tracking Using Video Datasets**
 
 ---
 
 ## 1. Project Overview
 
-**TrackNova** is a modular, Python-based computer vision application built with **OpenCV**, **Ultralytics YOLO**, **ByteTrack**, **Matplotlib**, **Pandas**, and **Streamlit**. It processes uploaded video datasets frame by frame, detects and classifies multiple objects, assigns persistent tracking IDs using ByteTrack, enables dynamic selection of a specific target ID, and quantifies that object's movement through pixel displacement, 2D image-plane direction, pixel-based speed, and trajectory visualization.
+**TrackNova is a computer vision platform built for Object-Specific Movement Detection and Tracking Using Video Datasets.** Built with **OpenCV**, **Ultralytics YOLO**, **ByteTrack**, **Matplotlib**, **Pandas**, and **Streamlit**, it processes uploaded video datasets frame by frame, detects and classifies multiple objects, assigns persistent tracking IDs using ByteTrack, enables dynamic selection of a specific target ID, and quantifies that object's movement through pixel displacement, 2D image-plane direction, pixel-based speed, and trajectory visualization.
 
 ### Project Objective
 

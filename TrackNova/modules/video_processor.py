@@ -2,19 +2,21 @@
 Video Input, Frame Extraction, Preprocessing, and Video Writing Module.
 
 Uses OpenCV VideoCapture/VideoWriter to stream video frames without
-loading entire video datasets into memory.
+loading entire video datasets into memory, and enforces deterministic
+source identification across dataset and uploaded video inputs.
 """
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator, Optional, Tuple
+from typing import Any, Dict, Generator, List, Optional, Tuple
 
 import cv2
 import numpy as np
 
-from config import PROCESSED_VIDEOS_DIR, SUPPORTED_VIDEO_EXTENSIONS
+from config import PROCESSED_VIDEOS_DIR, SUPPORTED_VIDEO_EXTENSIONS, UPLOADS_DIR
 from utils.helpers import sanitize_filename, timestamp_slug
 
 
@@ -34,8 +36,34 @@ class VideoMetadata:
     fourcc_str: str
 
 
-def save_uploaded_video(file_bytes: bytes, original_name: str, dest_dir: Path) -> Path:
-    """Persist an uploaded video stream to disk cleanly."""
+def compute_bytes_hash(file_bytes: bytes) -> str:
+    """Return a short SHA-256 digest identifying exact uploaded content."""
+    return hashlib.sha256(file_bytes).hexdigest()[:16]
+
+
+def compute_file_source_id(
+    source_type: str,
+    path: str | Path,
+    content_hash: Optional[str] = None,
+) -> str:
+    """Build a unique source identifier for a dataset or uploaded video file."""
+    p = Path(path).resolve()
+    if content_hash:
+        return f"{source_type}:{p.name}:{content_hash}"
+    stat = p.stat()
+    return f"{source_type}:{p.name}:{stat.st_size}:{stat.st_mtime_ns}"
+
+
+def save_uploaded_video(
+    file_bytes: bytes,
+    original_name: str,
+    dest_dir: Path = UPLOADS_DIR,
+) -> Tuple[Path, str]:
+    """
+    Persist an uploaded video stream to a unique temporary file under `dest_dir`.
+
+    Returns (resolved_path, short_content_hash).
+    """
     if not file_bytes:
         raise ValueError("Uploaded video file is empty (0 bytes).")
 
@@ -47,18 +75,15 @@ def save_uploaded_video(file_bytes: bytes, original_name: str, dest_dir: Path) -
 
     dest_dir.mkdir(parents=True, exist_ok=True)
     stem = sanitize_filename(Path(original_name).stem)
-    target = dest_dir / f"{stem}.{ext}"
-    if target.exists():
-        # Avoid overwriting an identically named dataset file with different bytes
-        if target.stat().st_size != len(file_bytes):
-            target = dest_dir / f"{stem}_{timestamp_slug()}.{ext}"
+    short_hash = compute_bytes_hash(file_bytes)
+    target = dest_dir / f"{stem}_{short_hash}_{timestamp_slug()}.{ext}"
     target.write_bytes(file_bytes)
-    return target
+    return target.resolve(), short_hash
 
 
 def validate_and_inspect_video(video_path: str | Path) -> VideoMetadata:
     """Open a video file with OpenCV, verify readability, and extract metadata."""
-    path = Path(video_path)
+    path = Path(video_path).resolve()
     if not path.exists() or not path.is_file():
         raise FileNotFoundError(f"Video file not found: {path.name}")
 
@@ -214,6 +239,117 @@ def read_single_frame(video_path: str | Path, frame_idx: int = 0) -> Optional[np
         return frame if ret else None
     finally:
         cap.release()
+
+
+def run_frame_preprocessing(
+    video_path: str | Path,
+    video_meta: VideoMetadata,
+    video_source_id: str,
+    target_width: Optional[int] = None,
+    enhance_contrast: bool = False,
+    frame_stride: int = 1,
+    max_samples: int = 4,
+) -> Dict[str, Any]:
+    """
+    Extract and preprocess frames strictly from `video_path` without storing
+    the full video in memory, returning verified dimensions and sample frames.
+    """
+    expected_steps = max(1, (video_meta.total_frames + max(1, frame_stride) - 1) // max(1, frame_stride))
+    sample_indices = set(
+        np.linspace(0, max(0, expected_steps - 1), num=min(max_samples, expected_steps), dtype=int).tolist()
+    )
+    sample_frames: List[Tuple[int, np.ndarray]] = []
+    frames_extracted = 0
+    proc_w, proc_h = video_meta.width, video_meta.height
+
+    for step_idx, (frame_idx, _ts, raw_frame) in enumerate(
+        iter_video_frames(video_path, fps=video_meta.fps, frame_stride=frame_stride)
+    ):
+        pre = preprocess_frame(
+            raw_frame,
+            target_width=target_width,
+            enhance_contrast=enhance_contrast,
+        )
+        proc_h, proc_w = pre.shape[:2]
+        frames_extracted += 1
+        if step_idx in sample_indices or len(sample_frames) == 0:
+            rgb = cv2.cvtColor(pre, cv2.COLOR_BGR2RGB)
+            sample_frames.append((int(frame_idx), rgb))
+
+    if frames_extracted == 0:
+        raise ValueError(f"No frames could be extracted from '{video_meta.file_name}'.")
+
+    return {
+        "video_source_id": video_source_id,
+        "video_path": str(Path(video_path).resolve()),
+        "video_name": video_meta.file_name,
+        "frames_extracted": frames_extracted,
+        "orig_size": (video_meta.width, video_meta.height),
+        "proc_size": (proc_w, proc_h),
+        "target_width": target_width,
+        "enhance_contrast": enhance_contrast,
+        "frame_stride": int(frame_stride),
+        "sample_frames": sample_frames[:max_samples],
+    }
+
+
+def get_browser_preview_bytes(
+    video_path: str | Path,
+    video_meta: VideoMetadata,
+    video_source_id: str,
+    cache_dir: Path = UPLOADS_DIR,
+) -> Tuple[bytes, str]:
+    """
+    Return browser-playable video bytes and MIME type for `video_path`.
+
+    If the container uses a codec browsers cannot decode natively (e.g. mp4v/XVID),
+    transcodes a cached H.264/avc1 preview keyed by `video_source_id`.
+    """
+    src = Path(video_path).resolve()
+    ext = src.suffix.lower()
+    fourcc_upper = (video_meta.fourcc_str or "").upper()
+    native_browser_h264 = ext == ".mp4" and fourcc_upper in {"AVC1", "H264", "X264"}
+    native_webm = ext == ".webm"
+
+    if native_browser_h264:
+        return src.read_bytes(), "video/mp4"
+    if native_webm:
+        return src.read_bytes(), "video/webm"
+
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    safe_id = sanitize_filename(video_source_id)
+    cached_preview = cache_dir / f"preview_{safe_id}.mp4"
+    if cached_preview.exists() and cached_preview.stat().st_size > 0:
+        return cached_preview.read_bytes(), "video/mp4"
+
+    # Attempt H.264 transcode so HTML5 <video> plays mp4v/AVI/MOV reliably
+    w = video_meta.width if video_meta.width % 2 == 0 else max(2, video_meta.width - 1)
+    h = video_meta.height if video_meta.height % 2 == 0 else max(2, video_meta.height - 1)
+    fps = video_meta.fps if video_meta.fps_is_valid and video_meta.fps > 0 else 25.0
+
+    for codec in ("avc1", "H264"):
+        writer = cv2.VideoWriter(
+            str(cached_preview),
+            cv2.VideoWriter_fourcc(*codec),
+            fps,
+            (w, h),
+        )
+        if writer is not None and writer.isOpened():
+            try:
+                for _idx, _ts, frame in iter_video_frames(src, fps=fps, frame_stride=1):
+                    if frame.shape[1] != w or frame.shape[0] != h:
+                        frame = cv2.resize(frame, (w, h))
+                    writer.write(frame)
+            finally:
+                writer.release()
+            if cached_preview.exists() and cached_preview.stat().st_size > 0:
+                return cached_preview.read_bytes(), "video/mp4"
+        if writer is not None:
+            writer.release()
+
+    # Fallback to raw bytes if no H.264 encoder is available
+    mime = "video/mp4" if ext == ".mp4" else "video/x-msvideo"
+    return src.read_bytes(), mime
 
 
 def create_video_writer(

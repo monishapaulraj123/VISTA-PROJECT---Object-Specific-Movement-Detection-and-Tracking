@@ -12,10 +12,12 @@ models/*.pt
 models/*.onnx
 
 # Generated runtime outputs (keep directory structure)
+outputs/uploads/*
 outputs/processed_videos/*
 outputs/graphs/*
 outputs/reports/*
 outputs/csv/*
+!outputs/uploads/.gitkeep
 !outputs/processed_videos/.gitkeep
 !outputs/graphs/.gitkeep
 !outputs/reports/.gitkeep

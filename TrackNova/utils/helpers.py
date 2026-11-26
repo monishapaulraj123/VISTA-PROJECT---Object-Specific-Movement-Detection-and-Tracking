@@ -90,8 +90,17 @@ def init_session_state() -> None:
         "current_page": "Dashboard",
         "debug_mode": False,
         "stop_requested": False,
+        "video_source_type": None,
+        "active_video_path": None,
+        "active_video_name": None,
+        "video_source_id": None,
         "video_path": None,
         "video_meta": None,
+        "preprocessed_preview": None,
+        "_prev_dataset_choice": "-- Select a dataset video --",
+        "_prev_upload_id": None,
+        "_uploader_nonce": 0,
+        "_pending_clear_dataset_select": False,
         "processing_status": "Idle",
         "processing_error": None,
         "processing_result": None,
@@ -115,6 +124,7 @@ def reset_tracking_session(keep_dataset_history: bool = True) -> None:
     st.session_state["stop_requested"] = False
     st.session_state["processing_status"] = "Idle"
     st.session_state["processing_error"] = None
+    st.session_state["preprocessed_preview"] = None
     st.session_state["processing_result"] = None
     st.session_state["selected_track_id"] = None
     st.session_state["movement_df"] = None
@@ -123,7 +133,16 @@ def reset_tracking_session(keep_dataset_history: bool = True) -> None:
     st.session_state["evaluation_result"] = None
     st.session_state["processed_video_path"] = None
     st.session_state["re_rendered_video_path"] = None
+    st.session_state["_live_partial"] = None
     if not keep_dataset_history:
+        st.session_state["video_source_type"] = None
+        st.session_state["active_video_path"] = None
+        st.session_state["active_video_name"] = None
+        st.session_state["video_source_id"] = None
         st.session_state["video_path"] = None
         st.session_state["video_meta"] = None
+        st.session_state["_prev_upload_id"] = None
+        st.session_state["_prev_dataset_choice"] = "-- Select a dataset video --"
+        st.session_state["_pending_clear_dataset_select"] = True
+        st.session_state["_uploader_nonce"] = int(st.session_state.get("_uploader_nonce", 0)) + 1
         st.session_state["dataset_sessions"] = []

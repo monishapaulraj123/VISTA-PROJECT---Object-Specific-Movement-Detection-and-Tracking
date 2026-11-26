@@ -14,7 +14,11 @@ import os
 APP_NAME = "TrackNova"
 FULL_TITLE = "Object-Specific Movement Detection and Tracking Using Video Datasets"
 TAGLINE = "See Every Movement. Track Every Object."
-SUBTITLE = "AI-Powered Object Tracking & Motion Intelligence"
+SUBTITLE = "Object Tracking & Motion Intelligence"
+PROJECT_DESCRIPTION = (
+    "TrackNova is a computer vision platform built for "
+    "Object-Specific Movement Detection and Tracking Using Video Datasets."
+)
 APP_VERSION = "1.0.0"
 
 # ---------------------------------------------------------------------------
@@ -27,6 +31,7 @@ LOGO_PATH = ASSETS_DIR / "logo.png"
 DATASET_VIDEOS_DIR = BASE_DIR / "dataset" / "videos"
 
 OUTPUTS_DIR = BASE_DIR / "outputs"
+UPLOADS_DIR = OUTPUTS_DIR / "uploads"
 PROCESSED_VIDEOS_DIR = OUTPUTS_DIR / "processed_videos"
 GRAPHS_DIR = OUTPUTS_DIR / "graphs"
 REPORTS_DIR = OUTPUTS_DIR / "reports"
@@ -38,6 +43,7 @@ for _dir in (
     MODELS_DIR / ".ultralytics",
     ASSETS_DIR,
     DATASET_VIDEOS_DIR,
+    UPLOADS_DIR,
     PROCESSED_VIDEOS_DIR,
     GRAPHS_DIR,
     REPORTS_DIR,

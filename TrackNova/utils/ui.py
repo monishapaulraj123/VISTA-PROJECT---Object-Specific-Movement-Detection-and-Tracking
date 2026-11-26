@@ -2,13 +2,13 @@
 TrackNova Custom UI Styling & Reusable Dashboard Components.
 
 Enforces the exact TrackNova dark navy / indigo / turquoise colour palette,
-custom CSS overrides, KPI cards, section headers, and empty/error states.
+consistent responsive card grids, uniform container sizing, and clean states.
 """
 
 from __future__ import annotations
 
 import html
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 import streamlit as st
 
@@ -33,8 +33,8 @@ def inject_tracknova_css() -> None:
             border-bottom: 1px solid {COLORS['borders']};
         }}
         .block-container {{
-            padding-top: 1.6rem;
-            padding-bottom: 2.5rem;
+            padding-top: 1.35rem;
+            padding-bottom: 2rem;
             max-width: 1380px;
         }}
 
@@ -58,9 +58,9 @@ def inject_tracknova_css() -> None:
             color: {COLORS['secondary_text']};
             border: 1px solid transparent;
             border-radius: 10px;
-            padding: 0.58rem 0.9rem;
+            padding: 0.54rem 0.88rem;
             font-weight: 500;
-            font-size: 0.92rem;
+            font-size: 0.9rem;
             transition: all 0.18s ease;
         }}
         div[data-testid="stSidebar"] .stButton > button:hover {{
@@ -80,14 +80,22 @@ def inject_tracknova_css() -> None:
         }}
 
         /* Main Area Buttons */
+        .stButton > button,
+        .stDownloadButton > button {{
+            min-height: 2.5rem;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.88rem;
+            line-height: 1.25;
+            white-space: normal;
+            word-break: break-word;
+            transition: background-color 0.18s ease, border-color 0.18s ease;
+        }}
         .stButton > button[kind="primary"],
         .stDownloadButton > button {{
             background-color: {COLORS['primary_indigo']};
             color: {COLORS['main_text']};
             border: 1px solid {COLORS['light_indigo']};
-            border-radius: 10px;
-            font-weight: 600;
-            transition: background-color 0.18s ease, transform 0.12s ease;
         }}
         .stButton > button[kind="primary"]:hover,
         .stDownloadButton > button:hover {{
@@ -99,60 +107,161 @@ def inject_tracknova_css() -> None:
             background-color: {COLORS['card_bg']};
             color: {COLORS['main_text']};
             border: 1px solid {COLORS['borders']};
-            border-radius: 10px;
         }}
         .stButton > button[kind="secondary"]:hover {{
             border-color: {COLORS['light_indigo']};
             background-color: #222B42;
         }}
 
-        /* Cards & Containers */
+        /* Streamlit Horizontal Columns & Bordered Containers */
+        [data-testid="stHorizontalBlock"] {{
+            align-items: stretch;
+            gap: 0.9rem;
+        }}
+        [data-testid="stVerticalBlockBorderWrapper"] {{
+            background-color: {COLORS['card_bg']};
+            border: 1px solid {COLORS['borders']} !important;
+            border-radius: 14px !important;
+            padding: 1rem 1.15rem !important;
+            box-shadow: 0 6px 18px rgba(5, 8, 18, 0.28);
+            box-sizing: border-box;
+            overflow: hidden;
+        }}
+
+        /* Prevent Media, Plots & Tables From Overflowing Containers */
+        [data-testid="stPyplot"],
+        [data-testid="stImage"],
+        [data-testid="stVideo"],
+        [data-testid="stDataFrame"] {{
+            max-width: 100%;
+            overflow: hidden;
+            box-sizing: border-box;
+        }}
+        [data-testid="stPyplot"] img,
+        [data-testid="stImage"] img {{
+            border-radius: 10px;
+            max-width: 100%;
+            height: auto;
+        }}
+
+        /* Section Titles */
+        .tn-section-title {{
+            color: {COLORS['light_indigo']};
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            margin: 1rem 0 0.55rem 0;
+            padding-bottom: 0.35rem;
+            border-bottom: 1px solid {COLORS['borders']};
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 0.75rem;
+        }}
+        .tn-section-sub {{
+            color: {COLORS['secondary_text']};
+            font-size: 0.8rem;
+            font-weight: 500;
+        }}
+
+        /* Responsive Equal-Height KPI Grid */
+        .tn-kpi-grid {{
+            display: grid;
+            grid-template-columns: repeat(var(--tn-cols, 4), minmax(0, 1fr));
+            gap: 0.85rem;
+            align-items: stretch;
+            margin-bottom: 0.85rem;
+        }}
+        @media (max-width: 1120px) {{
+            .tn-kpi-grid {{
+                grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            }}
+        }}
+        @media (max-width: 640px) {{
+            .tn-kpi-grid {{
+                grid-template-columns: 1fr;
+            }}
+        }}
+
+        /* Equal-Height Two-Column Card Grid */
+        .tn-two-col-grid {{
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.9rem;
+            align-items: stretch;
+            margin-bottom: 0.85rem;
+        }}
+        @media (max-width: 900px) {{
+            .tn-two-col-grid {{
+                grid-template-columns: 1fr;
+            }}
+        }}
+
+        /* Cards & KPI Cards */
         .tn-card {{
             background-color: {COLORS['card_bg']};
             border: 1px solid {COLORS['borders']};
             border-radius: 14px;
-            padding: 1.05rem 1.2rem;
-            box-shadow: 0 6px 20px rgba(5, 8, 18, 0.35);
+            padding: 1rem 1.15rem;
+            box-shadow: 0 6px 18px rgba(5, 8, 18, 0.28);
             margin-bottom: 0.85rem;
+            box-sizing: border-box;
+            height: 100%;
+        }}
+        .tn-two-col-grid .tn-card {{
+            margin-bottom: 0;
         }}
         .tn-kpi-card {{
             background-color: {COLORS['card_bg']};
             border: 1px solid {COLORS['borders']};
             border-radius: 14px;
-            padding: 1rem 1.15rem;
-            box-shadow: 0 6px 18px rgba(5, 8, 18, 0.32);
+            padding: 0.95rem 1.1rem;
+            box-shadow: 0 6px 18px rgba(5, 8, 18, 0.28);
+            min-height: 106px;
             height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-sizing: border-box;
+            overflow: hidden;
         }}
         .tn-kpi-label {{
             color: {COLORS['secondary_text']};
-            font-size: 0.78rem;
+            font-size: 0.74rem;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             margin-bottom: 0.35rem;
+            line-height: 1.25;
         }}
         .tn-kpi-value {{
             color: {COLORS['main_text']};
-            font-size: 1.48rem;
+            font-size: 1.35rem;
             font-weight: 700;
-            line-height: 1.2;
+            line-height: 1.25;
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }}
         .tn-kpi-sub {{
             color: {COLORS['light_indigo']};
-            font-size: 0.78rem;
-            margin-top: 0.3rem;
+            font-size: 0.77rem;
+            margin-top: 0.35rem;
+            line-height: 1.3;
+            overflow-wrap: anywhere;
         }}
+
+        /* Page Header */
         .tn-header-bar {{
             background-color: {COLORS['sidebar_bg']};
             border: 1px solid {COLORS['borders']};
             border-left: 4px solid {COLORS['primary_indigo']};
             border-radius: 14px;
-            padding: 1.15rem 1.4rem;
-            margin-bottom: 1.25rem;
-            box-shadow: 0 8px 24px rgba(5, 8, 18, 0.35);
+            padding: 1rem 1.3rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 6px 20px rgba(5, 8, 18, 0.3);
         }}
         .tn-header-title {{
-            font-size: 1.5rem;
+            font-size: 1.42rem;
             font-weight: 700;
             color: {COLORS['main_text']};
             margin: 0;
@@ -162,69 +271,61 @@ def inject_tracknova_css() -> None:
         }}
         .tn-header-sub {{
             color: {COLORS['secondary_text']};
-            font-size: 0.9rem;
-            margin-top: 0.25rem;
+            font-size: 0.88rem;
+            margin-top: 0.22rem;
         }}
+
+        /* Empty & Alert States */
         .tn-empty-state {{
             background-color: {COLORS['card_bg']};
             border: 1px dashed {COLORS['borders']};
-            border-radius: 16px;
-            padding: 2.5rem 1.5rem;
+            border-radius: 14px;
+            padding: 2.2rem 1.4rem;
             text-align: center;
-            margin: 1rem 0;
-        }}
-        .tn-badge {{
-            display: inline-block;
-            padding: 0.2rem 0.6rem;
-            border-radius: 999px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            border: 1px solid {COLORS['borders']};
-            background-color: {COLORS['sidebar_bg']};
-            color: {COLORS['trajectory_accent']};
+            margin: 0.75rem 0 1rem 0;
         }}
         .tn-alert-warn {{
             background-color: rgba(251, 191, 36, 0.08);
             border: 1px solid rgba(251, 191, 36, 0.38);
             border-left: 4px solid {COLORS['warning']};
             border-radius: 10px;
-            padding: 0.85rem 1rem;
+            padding: 0.75rem 0.95rem;
             color: {COLORS['main_text']};
-            font-size: 0.9rem;
-            margin-bottom: 0.85rem;
+            font-size: 0.88rem;
+            margin-bottom: 0.75rem;
         }}
         .tn-alert-error {{
             background-color: rgba(248, 113, 113, 0.08);
             border: 1px solid rgba(248, 113, 113, 0.42);
             border-left: 4px solid {COLORS['error']};
             border-radius: 10px;
-            padding: 0.85rem 1rem;
+            padding: 0.75rem 0.95rem;
             color: {COLORS['main_text']};
-            font-size: 0.9rem;
-            margin-bottom: 0.85rem;
+            font-size: 0.88rem;
+            margin-bottom: 0.75rem;
         }}
         .tn-alert-info {{
             background-color: rgba(72, 214, 194, 0.08);
             border: 1px solid rgba(72, 214, 194, 0.35);
             border-left: 4px solid {COLORS['trajectory_accent']};
             border-radius: 10px;
-            padding: 0.85rem 1rem;
+            padding: 0.75rem 0.95rem;
             color: {COLORS['main_text']};
-            font-size: 0.9rem;
-            margin-bottom: 0.85rem;
+            font-size: 0.88rem;
+            margin-bottom: 0.75rem;
         }}
 
-        /* Inputs, Selectboxes, Expanders, DataFrames */
+        /* Inputs, Expanders, Uploaders */
         [data-testid="stExpander"] {{
-            background-color: {COLORS['card_bg']};
+            background-color: {COLORS['sidebar_bg']};
             border: 1px solid {COLORS['borders']};
             border-radius: 12px;
         }}
         [data-testid="stFileUploader"] {{
-            background-color: {COLORS['card_bg']};
+            background-color: {COLORS['sidebar_bg']};
             border: 1px dashed {COLORS['borders']};
             border-radius: 12px;
-            padding: 0.6rem;
+            padding: 0.55rem;
         }}
         div[data-baseweb="select"] > div {{
             background-color: {COLORS['sidebar_bg']};
@@ -254,23 +355,59 @@ def render_page_header(title: str, subtitle: str, icon_name: str = "crosshair") 
     )
 
 
+def render_section_title(title: str, subtitle: str = "") -> None:
+    """Render a uniform section heading bar."""
+    sub_html = f'<span class="tn-section-sub">{html.escape(subtitle)}</span>' if subtitle else ""
+    st.markdown(
+        f'<div class="tn-section-title"><span>{html.escape(title)}</span>{sub_html}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _kpi_card_html(
+    label: str,
+    value: str,
+    subtext: str = "",
+    accent_color: Optional[str] = None,
+) -> str:
+    """Return HTML markup for a single equal-height KPI card."""
+    val_style = f"color:{accent_color};" if accent_color else ""
+    sub_html = f'<div class="tn-kpi-sub">{html.escape(subtext)}</div>' if subtext else ""
+    safe_val = html.escape(str(value))
+    return (
+        f'<div class="tn-kpi-card" title="{safe_val}">'
+        f'<div><div class="tn-kpi-label">{html.escape(label)}</div>'
+        f'<div class="tn-kpi-value" style="{val_style}">{safe_val}</div></div>'
+        f"{sub_html}</div>"
+    )
+
+
 def render_kpi_card(
     label: str,
     value: str,
     subtext: str = "",
     accent_color: Optional[str] = None,
 ) -> None:
-    """Render a styled analytics metric card."""
-    val_style = f"color:{accent_color};" if accent_color else ""
-    sub_html = f'<div class="tn-kpi-sub">{html.escape(subtext)}</div>' if subtext else ""
+    """Render a single styled analytics metric card."""
+    st.markdown(_kpi_card_html(label, value, subtext, accent_color), unsafe_allow_html=True)
+
+
+def render_kpi_grid(cards: List[Dict[str, Any]], columns: Optional[int] = None) -> None:
+    """Render a responsive, equal-height grid of KPI cards."""
+    if not cards:
+        return
+    col_count = columns or min(5, max(1, len(cards)))
+    cards_html = "".join(
+        _kpi_card_html(
+            label=str(c.get("label", "")),
+            value=str(c.get("value", "")),
+            subtext=str(c.get("subtext", "")),
+            accent_color=c.get("accent_color"),
+        )
+        for c in cards
+    )
     st.markdown(
-        f"""
-        <div class="tn-kpi-card">
-            <div class="tn-kpi-label">{html.escape(label)}</div>
-            <div class="tn-kpi-value" style="{val_style}">{html.escape(str(value))}</div>
-            {sub_html}
-        </div>
-        """,
+        f'<div class="tn-kpi-grid" style="--tn-cols:{col_count};">{cards_html}</div>',
         unsafe_allow_html=True,
     )
 
@@ -284,13 +421,13 @@ def render_empty_state(
     key: str = "empty_cta",
 ) -> None:
     """Render a clean, helpful empty state with optional navigation CTA."""
-    icon_html = lucide_svg(icon_name, size=38, color=COLORS["light_indigo"])
+    icon_html = lucide_svg(icon_name, size=36, color=COLORS["light_indigo"])
     st.markdown(
         f"""
         <div class="tn-empty-state">
-            <div style="margin-bottom:0.75rem;">{icon_html}</div>
-            <h3 style="margin:0 0 0.45rem 0; color:{COLORS['main_text']};">{html.escape(title)}</h3>
-            <p style="margin:0 auto; max-width:560px; color:{COLORS['secondary_text']}; font-size:0.94rem;">
+            <div style="margin-bottom:0.65rem;">{icon_html}</div>
+            <h3 style="margin:0 0 0.4rem 0; color:{COLORS['main_text']}; font-size:1.15rem;">{html.escape(title)}</h3>
+            <p style="margin:0 auto; max-width:540px; color:{COLORS['secondary_text']}; font-size:0.9rem; line-height:1.5;">
                 {html.escape(description)}
             </p>
         </div>
@@ -298,9 +435,9 @@ def render_empty_state(
         unsafe_allow_html=True,
     )
     if cta_label and cta_target_page:
-        col1, col2, col3 = st.columns([2, 1.5, 2])
+        col1, col2, col3 = st.columns([2, 1.4, 2])
         with col2:
-            if st.button(cta_label, type="primary", use_container_width=True, key=key):
+            if st.button(cta_label, type="primary", width="stretch", key=key):
                 st.session_state["current_page"] = cta_target_page
                 st.rerun()
 

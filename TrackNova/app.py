@@ -1,5 +1,5 @@
 """
-TrackNova — AI-Powered Object-Specific Movement Detection and Tracking System.
+TrackNova — Object-Specific Movement Detection and Tracking System.
 
 Main Streamlit entry point configuring page identity, custom dark-navy theme,
 sidebar branding & navigation, and modular page routing.
@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from config import APP_NAME, COLORS, LOGO_PATH, NAV_PAGES, SUBTITLE, TAGLINE
+from config import APP_NAME, COLORS, LOGO_PATH, NAV_PAGES, SUBTITLE
 from pages import (
     about,
     dashboard,
@@ -66,8 +66,8 @@ def _render_sidebar() -> None:
                     <div style="font-size:1.22rem;font-weight:800;color:{COLORS['main_text']};letter-spacing:0.02em;">
                         {APP_NAME}
                     </div>
-                    <div style="font-size:0.72rem;color:{COLORS['trajectory_accent']};font-weight:600;">
-                        {TAGLINE}
+                    <div style="font-size:0.72rem;color:{COLORS['trajectory_accent']};font-weight:600;line-height:1.25;">
+                        {SUBTITLE}
                     </div>
                 </div>
             </div>
@@ -84,7 +84,7 @@ def _render_sidebar() -> None:
         active_page = st.session_state.get("current_page", "Dashboard")
         for page_name in NAV_PAGES:
             btn_type = "primary" if page_name == active_page else "secondary"
-            if st.button(page_name, type=btn_type, use_container_width=True, key=f"nav_{page_name}"):
+            if st.button(page_name, type=btn_type, width="stretch", key=f"nav_{page_name}"):
                 st.session_state["current_page"] = page_name
                 st.rerun()
 
@@ -108,7 +108,7 @@ def _render_sidebar() -> None:
             )
             st.markdown("<div style='height:0.55rem;'></div>", unsafe_allow_html=True)
 
-        if st.button("Reset Full Session", type="secondary", use_container_width=True, key="sidebar_reset_all"):
+        if st.button("Reset Full Session", type="secondary", width="stretch", key="sidebar_reset_all"):
             reset_tracking_session(keep_dataset_history=False)
             st.session_state["current_page"] = "Dashboard"
             st.rerun()
