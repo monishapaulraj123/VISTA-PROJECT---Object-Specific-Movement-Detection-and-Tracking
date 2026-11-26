@@ -1,0 +1,31 @@
+# Python bytecode & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+
+# Ultralytics runtime config & downloaded model weights
+models/.ultralytics/
+models/*.pt
+models/*.onnx
+
+# Generated runtime outputs (keep directory structure)
+outputs/processed_videos/*
+outputs/graphs/*
+outputs/reports/*
+outputs/csv/*
+!outputs/processed_videos/.gitkeep
+!outputs/graphs/.gitkeep
+!outputs/reports/.gitkeep
+!outputs/csv/.gitkeep
+
+# Optional: ignore large user-uploaded videos while keeping sample clips or .gitkeep
+# dataset/videos/*.mp4
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
