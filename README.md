@@ -3,7 +3,7 @@
 **Object-Specific Movement Detection and Tracking Using Video Datasets**
 
 > **See Every Movement. Track Every Object.**  
-> *AI-Powered Object Tracking & Motion Intelligence*
+> 
 
 ---
 
