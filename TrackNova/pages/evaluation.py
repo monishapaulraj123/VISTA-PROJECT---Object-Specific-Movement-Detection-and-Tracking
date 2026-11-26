@@ -13,7 +13,7 @@ import pandas as pd
 import streamlit as st
 
 from config import COLORS
-from modules.analytics import sessions_to_dataframe
+from modules.analytics import sessions_to_dataframe, sync_active_tracking_state
 from modules.evaluation import evaluate_tracking_performance
 from modules.export import export_comparison_csv
 from utils.helpers import format_duration
@@ -32,9 +32,7 @@ def render() -> None:
         icon_name="gauge",
     )
 
-    session_result = st.session_state.get("processing_result")
-    movement_df = st.session_state.get("movement_df")
-    movement_summary = st.session_state.get("movement_summary")
+    session_result, movement_df, movement_summary = sync_active_tracking_state()
 
     if session_result is None:
         render_empty_state(

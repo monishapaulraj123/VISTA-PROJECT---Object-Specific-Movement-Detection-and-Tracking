@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import streamlit as st
 
 from config import COLORS
-from modules.analytics import sessions_to_dataframe
+from modules.analytics import sessions_to_dataframe, sync_active_tracking_state
 from modules.evaluation import evaluate_tracking_performance
 from modules.export import (
     export_comparison_csv,
@@ -50,7 +50,7 @@ def render() -> None:
         icon_name="file-text",
     )
 
-    session_result = st.session_state.get("processing_result")
+    session_result, movement_df, movement_summary = sync_active_tracking_state()
     if session_result is None:
         render_empty_state(
             title="No Results Ready for Export",
@@ -61,9 +61,6 @@ def render() -> None:
             key="rep_empty_cta",
         )
         return
-
-    movement_df = st.session_state.get("movement_df")
-    movement_summary = st.session_state.get("movement_summary")
     has_selected = bool(
         movement_df is not None
         and not movement_df.empty

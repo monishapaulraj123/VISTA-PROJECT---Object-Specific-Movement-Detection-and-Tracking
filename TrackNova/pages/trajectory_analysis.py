@@ -2,15 +2,18 @@
 TrackNova Trajectory Analysis Page.
 
 Generates all 5 Matplotlib movement & trajectory charts from real tracking data
-inside balanced, equal-height card containers with PNG downloads.
+for the active video session inside balanced card containers with PNG downloads.
 """
 
 from __future__ import annotations
+
+from typing import List, Optional
 
 import matplotlib.pyplot as plt
 import streamlit as st
 
 from config import COLORS
+from modules.analytics import activate_selected_track_id, sync_active_tracking_state
 from modules.trajectory import build_trajectory_data
 from modules.visualization import (
     figure_to_png_bytes,
@@ -55,11 +58,9 @@ def render() -> None:
         icon_name="activity",
     )
 
-    session_result = st.session_state.get("processing_result")
-    movement_df = st.session_state.get("movement_df")
-    summary = st.session_state.get("movement_summary")
+    session_result, movement_df, summary = sync_active_tracking_state()
 
-    if session_result is None or movement_df is None or movement_df.empty or not summary or not summary.get("has_data"):
+    if session_result is None:
         render_empty_state(
             title="No Trajectory Data Available",
             description="Process a video and select a ByteTrack object ID in Video Tracking to generate trajectory paths and movement graphs.",
@@ -70,11 +71,77 @@ def render() -> None:
         )
         return
 
+    if not session_result.unique_track_ids:
+        render_empty_state(
+            title="No Persistent Tracking IDs Found",
+            description=(
+                f"Processed {session_result.total_frames_processed} frames from "
+                f"'{st.session_state.get('active_video_name') or session_result.video_meta.file_name}' "
+                f"({session_result.total_detections} raw detections), but ByteTrack did not establish persistent tracking IDs. "
+                "Try lowering the confidence threshold or removing class filters in Video Tracking."
+            ),
+            icon_name="activity",
+            cta_label="Adjust Settings in Video Tracking",
+            cta_target_page="Video Tracking",
+            key="ta_empty_no_tracks",
+        )
+        return
+
+    active_name = st.session_state.get("active_video_name") or session_result.video_meta.file_name
+
+    # Allow selecting/switching Target Tracking ID directly on Trajectory Analysis
+    with st.container(border=True):
+        sel_c1, sel_c2 = st.columns([2.2, 1])
+        options: List[Optional[int]] = [None] + session_result.unique_track_ids
+        cur_sel = st.session_state.get("selected_track_id")
+        if cur_sel not in options:
+            cur_sel = None
+
+        def _fmt(val: Optional[int]) -> str:
+            if val is None:
+                return "-- Select a Tracking ID --"
+            s = session_result.track_summaries[val]
+            return f"ID #{val} — {s.class_name} ({s.frames_tracked} frames, conf {s.avg_confidence:.2f})"
+
+        with sel_c1:
+            chosen = st.selectbox(
+                f"Active Target Tracking ID ({active_name})",
+                options=options,
+                index=options.index(cur_sel),
+                format_func=_fmt,
+                key="ta_track_id_select",
+            )
+            if chosen != cur_sel:
+                activate_selected_track_id(
+                    session_result, chosen, user_cleared=(chosen is None)
+                )
+                st.session_state["re_rendered_video_path"] = None
+                st.rerun()
+        with sel_c2:
+            st.markdown(
+                f"<div style='padding-top:1.7rem;color:{COLORS['secondary_text']};font-size:0.84rem;'>"
+                f"Detected IDs: <strong style='color:{COLORS['trajectory_accent']};'>{len(session_result.unique_track_ids)}</strong> "
+                f"| Resolution: <strong style='color:{COLORS['main_text']};'>{session_result.processed_width}x{session_result.processed_height}</strong>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+    if movement_df is None or movement_df.empty or not summary or not summary.get("has_data"):
+        render_empty_state(
+            title="No Object ID Selected",
+            description="Choose one of the detected ByteTrack IDs above (or in Video Tracking) to generate trajectory graphs.",
+            icon_name="activity",
+            cta_label="Go to Video Tracking",
+            cta_target_page="Video Tracking",
+            key="ta_empty_no_id",
+        )
+        return
+
     traj = build_trajectory_data(movement_df)
     tid = summary["selected_id"]
     lin = traj.get("linearity_ratio")
 
-    render_section_title("Trajectory Summary", f"Target ID #{tid}")
+    render_section_title("Trajectory Summary", f"{active_name} • Target ID #{tid}")
     render_kpi_grid(
         [
             {

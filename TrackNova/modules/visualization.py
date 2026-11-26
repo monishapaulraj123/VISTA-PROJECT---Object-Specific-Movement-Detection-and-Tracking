@@ -420,8 +420,10 @@ def plot_x_vs_frame(movement_df: pd.DataFrame):
     fig, ax = _new_styled_figure()
     frames = movement_df["frame_number"]
     xs = movement_df["center_x"]
-    ax.plot(frames, xs, color=COLORS["light_indigo"], linewidth=2.2, label="Center X (px)")
-    ax.fill_between(frames, xs, xs.min(), color=COLORS["primary_indigo"], alpha=0.18)
+    marker = "o" if len(frames) <= 12 else None
+    ax.plot(frames, xs, color=COLORS["light_indigo"], linewidth=2.2, marker=marker, markersize=5, label="Center X (px)")
+    if len(frames) >= 2:
+        ax.fill_between(frames, xs, xs.min(), color=COLORS["primary_indigo"], alpha=0.18)
     _apply_tracknova_axes_style(
         ax, "Horizontal Position (Center X) vs Frame Number", "Frame Number", "Center X (pixels)"
     )
@@ -435,8 +437,10 @@ def plot_y_vs_frame(movement_df: pd.DataFrame):
     fig, ax = _new_styled_figure()
     frames = movement_df["frame_number"]
     ys = movement_df["center_y"]
-    ax.plot(frames, ys, color=COLORS["trajectory_accent"], linewidth=2.2, label="Center Y (px)")
-    ax.fill_between(frames, ys, ys.min(), color=COLORS["trajectory_accent"], alpha=0.12)
+    marker = "o" if len(frames) <= 12 else None
+    ax.plot(frames, ys, color=COLORS["trajectory_accent"], linewidth=2.2, marker=marker, markersize=5, label="Center Y (px)")
+    if len(frames) >= 2:
+        ax.fill_between(frames, ys, ys.min(), color=COLORS["trajectory_accent"], alpha=0.12)
     _apply_tracknova_axes_style(
         ax,
         "Vertical Position (Center Y) vs Frame Number (Image Y: Top=0)",
@@ -471,8 +475,9 @@ def plot_speed_vs_frame(movement_df: pd.DataFrame):
     frames = valid["frame_number"]
     speeds = valid["pixel_speed_px_s"]
     mean_spd = float(speeds.mean())
+    marker = "o" if len(frames) <= 12 else None
 
-    ax.plot(frames, speeds, color=COLORS["trajectory_accent"], linewidth=2.0, label="Instantaneous Speed")
+    ax.plot(frames, speeds, color=COLORS["trajectory_accent"], linewidth=2.0, marker=marker, markersize=5, label="Instantaneous Speed")
     ax.axhline(
         mean_spd,
         color=COLORS["warning"],
@@ -480,7 +485,8 @@ def plot_speed_vs_frame(movement_df: pd.DataFrame):
         linewidth=1.5,
         label=f"Mean Speed ({mean_spd:.1f} px/s)",
     )
-    ax.fill_between(frames, speeds, 0, color=COLORS["trajectory_accent"], alpha=0.14)
+    if len(frames) >= 2:
+        ax.fill_between(frames, speeds, 0, color=COLORS["trajectory_accent"], alpha=0.14)
     _apply_tracknova_axes_style(
         ax, "Selected Object Pixel Speed vs Frame Number", "Frame Number", "Pixel Speed (px/s)"
     )
@@ -545,10 +551,10 @@ def plot_xy_trajectory(
     if frame_width and frame_height:
         ax.set_xlim(0, frame_width)
         ax.set_ylim(frame_height, 0)
+        ax.set_aspect("equal", adjustable="box")
     else:
         ax.invert_yaxis()
-
-    ax.set_aspect("equal", adjustable="datalim")
+        ax.set_aspect("equal", adjustable="datalim")
     _apply_tracknova_axes_style(
         ax,
         "2D Image-Plane Trajectory (Origin Top-Left, Y Increases Downward)",
@@ -566,8 +572,9 @@ def plot_displacement_analysis(movement_df: pd.DataFrame):
     fig.patch.set_facecolor(COLORS["main_bg"])
 
     frames = movement_df["frame_number"]
-    ax1.plot(frames, movement_df["dx"], color=COLORS["light_indigo"], linewidth=1.8, label="DX (Horizontal, +Right)")
-    ax1.plot(frames, movement_df["dy"], color=COLORS["warning"], linewidth=1.8, label="DY (Vertical, +Down)")
+    marker = "o" if len(frames) <= 12 else None
+    ax1.plot(frames, movement_df["dx"], color=COLORS["light_indigo"], linewidth=1.8, marker=marker, markersize=4, label="DX (Horizontal, +Right)")
+    ax1.plot(frames, movement_df["dy"], color=COLORS["warning"], linewidth=1.8, marker=marker, markersize=4, label="DY (Vertical, +Down)")
     ax1.axhline(0, color=COLORS["borders"], linewidth=1.0)
     _apply_tracknova_axes_style(
         ax1, "Step-wise X / Y Displacement vs Frame Number", "", "Displacement (px)"
@@ -579,15 +586,18 @@ def plot_displacement_analysis(movement_df: pd.DataFrame):
         movement_df["cumulative_displacement_px"],
         color=COLORS["trajectory_accent"],
         linewidth=2.3,
+        marker=marker,
+        markersize=4,
         label="Cumulative Distance (px)",
     )
-    ax2.fill_between(
-        frames,
-        movement_df["cumulative_displacement_px"],
-        0,
-        color=COLORS["trajectory_accent"],
-        alpha=0.14,
-    )
+    if len(frames) >= 2:
+        ax2.fill_between(
+            frames,
+            movement_df["cumulative_displacement_px"],
+            0,
+            color=COLORS["trajectory_accent"],
+            alpha=0.14,
+        )
     _apply_tracknova_axes_style(
         ax2, "Cumulative Euclidean Displacement", "Frame Number", "Total Distance (px)"
     )

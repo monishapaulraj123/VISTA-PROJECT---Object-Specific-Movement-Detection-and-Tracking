@@ -3,14 +3,17 @@ TrackNova Object Analysis Page.
 
 Displays detailed real movement kinematics, displacement breakdown,
 coordinate convention reference, and frame-by-frame tabular data for the
-selected tracking ID.
+selected tracking ID from the active video session.
 """
 
 from __future__ import annotations
 
+from typing import List, Optional
+
 import streamlit as st
 
 from config import COLORS
+from modules.analytics import activate_selected_track_id, sync_active_tracking_state
 from utils.helpers import format_duration
 from utils.ui import (
     render_empty_state,
@@ -27,9 +30,7 @@ def render() -> None:
         icon_name="crosshair",
     )
 
-    session_result = st.session_state.get("processing_result")
-    movement_df = st.session_state.get("movement_df")
-    summary = st.session_state.get("movement_summary")
+    session_result, movement_df, summary = sync_active_tracking_state()
 
     if session_result is None:
         render_empty_state(
@@ -42,12 +43,67 @@ def render() -> None:
         )
         return
 
+    if not session_result.unique_track_ids:
+        render_empty_state(
+            title="No Persistent Tracking IDs Found",
+            description=(
+                f"Processed {session_result.total_frames_processed} frames from "
+                f"'{st.session_state.get('active_video_name') or session_result.video_meta.file_name}' "
+                f"({session_result.total_detections} raw detections), but ByteTrack did not establish persistent tracking IDs. "
+                "Try lowering the confidence threshold or removing class filters in Video Tracking."
+            ),
+            icon_name="crosshair",
+            cta_label="Adjust Settings in Video Tracking",
+            cta_target_page="Video Tracking",
+            key="oa_empty_no_tracks",
+        )
+        return
+
+    active_name = st.session_state.get("active_video_name") or session_result.video_meta.file_name
+
+    # Allow selecting/switching Target Tracking ID directly on Object Analysis
+    with st.container(border=True):
+        sel_c1, sel_c2 = st.columns([2.2, 1])
+        options: List[Optional[int]] = [None] + session_result.unique_track_ids
+        cur_sel = st.session_state.get("selected_track_id")
+        if cur_sel not in options:
+            cur_sel = None
+
+        def _fmt(val: Optional[int]) -> str:
+            if val is None:
+                return "-- Select a Tracking ID --"
+            s = session_result.track_summaries[val]
+            return f"ID #{val} — {s.class_name} ({s.frames_tracked} frames, conf {s.avg_confidence:.2f})"
+
+        with sel_c1:
+            chosen = st.selectbox(
+                f"Active Target Tracking ID ({active_name})",
+                options=options,
+                index=options.index(cur_sel),
+                format_func=_fmt,
+                key="oa_track_id_select",
+            )
+            if chosen != cur_sel:
+                activate_selected_track_id(
+                    session_result, chosen, user_cleared=(chosen is None)
+                )
+                st.session_state["re_rendered_video_path"] = None
+                st.rerun()
+        with sel_c2:
+            st.markdown(
+                f"<div style='padding-top:1.7rem;color:{COLORS['secondary_text']};font-size:0.84rem;'>"
+                f"Detected IDs: <strong style='color:{COLORS['trajectory_accent']};'>{len(session_result.unique_track_ids)}</strong> "
+                f"| Frames: <strong style='color:{COLORS['main_text']};'>{session_result.total_frames_processed}</strong>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
     if movement_df is None or movement_df.empty or not summary or not summary.get("has_data"):
         render_empty_state(
             title="No Object ID Selected",
-            description="Select one of the detected ByteTrack IDs in Video Tracking to view detailed object-specific movement metrics.",
+            description="Choose one of the detected ByteTrack IDs above (or in Video Tracking) to view detailed object-specific movement metrics.",
             icon_name="crosshair",
-            cta_label="Select Object ID",
+            cta_label="Go to Video Tracking",
             cta_target_page="Video Tracking",
             key="oa_empty_no_id",
         )
@@ -57,7 +113,7 @@ def render() -> None:
     max_spd = summary.get("max_speed_px_s")
     dur = summary.get("tracking_duration_sec")
 
-    render_section_title("Target Kinematics Summary", f"Tracking ID #{summary['selected_id']}")
+    render_section_title("Target Kinematics Summary", f"{active_name} • Tracking ID #{summary['selected_id']}")
     render_kpi_grid(
         [
             {
@@ -114,7 +170,6 @@ def render() -> None:
             unsafe_allow_html=True,
         )
 
-    # Compact 3-column reference bar inside a balanced card
     st.markdown(
         f"""
         <div class="tn-card" style="padding:0.85rem 1.1rem;">

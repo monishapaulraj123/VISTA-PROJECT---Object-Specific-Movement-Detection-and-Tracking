@@ -82,10 +82,9 @@ class ByteTrackProcessor:
         self._reset_predictor_tracker()
 
     def _reset_predictor_tracker(self) -> None:
-        """Reset Ultralytics internal tracker state before starting a new video."""
-        predictor = getattr(self.model, "predictor", None)
-        if predictor is not None and hasattr(predictor, "trackers"):
-            predictor.trackers = []
+        """Reset Ultralytics predictor & tracker state cleanly before a new video."""
+        if hasattr(self.model, "predictor"):
+            self.model.predictor = None
 
     def track_frame(self, frame: np.ndarray) -> List[Detection]:
         """Run YOLO detection + ByteTrack association on the next sequential frame."""

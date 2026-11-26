@@ -125,6 +125,7 @@ def main() -> None:
     active_page = st.session_state.get("current_page", "Dashboard")
     render_fn = PAGE_DISPATCH.get(active_page, dashboard.render)
     render_fn()
+    st.session_state["_active_rendered_page"] = active_page
 
 
 if __name__ == "__main__":

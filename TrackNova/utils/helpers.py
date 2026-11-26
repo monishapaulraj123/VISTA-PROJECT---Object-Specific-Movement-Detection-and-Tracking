@@ -101,6 +101,8 @@ def init_session_state() -> None:
         "_prev_upload_id": None,
         "_uploader_nonce": 0,
         "_pending_clear_dataset_select": False,
+        "_active_rendered_page": None,
+        "_user_cleared_selection": False,
         "processing_status": "Idle",
         "processing_error": None,
         "processing_result": None,
@@ -134,6 +136,7 @@ def reset_tracking_session(keep_dataset_history: bool = True) -> None:
     st.session_state["processed_video_path"] = None
     st.session_state["re_rendered_video_path"] = None
     st.session_state["_live_partial"] = None
+    st.session_state["_user_cleared_selection"] = False
     if not keep_dataset_history:
         st.session_state["video_source_type"] = None
         st.session_state["active_video_path"] = None

@@ -7,12 +7,18 @@ comparison rows across multiple tested videos in the session.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
+import streamlit as st
 
+from config import DEFAULT_MOVEMENT_THRESHOLD_PX
+from modules.evaluation import evaluate_tracking_performance
+from modules.movement import calculate_selected_object_movement
 from modules.tracking import TrackingSessionResult
-from utils.helpers import format_duration
+from modules.trajectory import build_trajectory_data
+from utils.helpers import format_duration, reset_tracking_session
 
 
 def compute_dashboard_metrics(
@@ -143,3 +149,98 @@ def sessions_to_dataframe(sessions: List[Dict[str, Any]]) -> pd.DataFrame:
     if not sessions:
         return pd.DataFrame()
     return pd.DataFrame(sessions)
+
+
+def activate_selected_track_id(
+    session_result: TrackingSessionResult,
+    track_id: Optional[int],
+    movement_threshold_px: Optional[float] = None,
+    user_cleared: bool = False,
+) -> None:
+    """Compute movement, trajectory, evaluation, and comparison updates for `track_id`."""
+    if movement_threshold_px is None:
+        movement_threshold_px = float(
+            st.session_state.get("last_settings", {}).get(
+                "movement_threshold_px", DEFAULT_MOVEMENT_THRESHOLD_PX
+            )
+        )
+
+    st.session_state["selected_track_id"] = track_id
+    st.session_state["_user_cleared_selection"] = bool(user_cleared and track_id is None)
+
+    if track_id is None:
+        st.session_state["movement_df"] = None
+        st.session_state["movement_summary"] = None
+        st.session_state["trajectory_points"] = []
+        st.session_state["evaluation_result"] = evaluate_tracking_performance(
+            session_result, None, None
+        )
+    else:
+        mdf, msum = calculate_selected_object_movement(
+            session_result, track_id, movement_threshold_px=movement_threshold_px
+        )
+        traj = build_trajectory_data(mdf)
+        st.session_state["movement_df"] = mdf
+        st.session_state["movement_summary"] = msum
+        st.session_state["trajectory_points"] = traj.get("points", [])
+        st.session_state["evaluation_result"] = evaluate_tracking_performance(
+            session_result, mdf, msum
+        )
+
+    rec = build_dataset_comparison_record(
+        session_result, st.session_state.get("movement_summary")
+    )
+    st.session_state["dataset_sessions"] = upsert_dataset_session(
+        st.session_state.get("dataset_sessions", []), rec
+    )
+
+
+def sync_active_tracking_state() -> Tuple[Optional[TrackingSessionResult], Optional[pd.DataFrame], Optional[Dict[str, Any]]]:
+    """
+    Ensure `processing_result`, `movement_df`, and `movement_summary` correspond
+    to the current `active_video_path` and selected tracking ID.
+    """
+    session_result: Optional[TrackingSessionResult] = st.session_state.get("processing_result")
+    active_path = st.session_state.get("active_video_path")
+
+    if session_result is None:
+        return None, None, None
+
+    if active_path:
+        try:
+            if Path(session_result.video_meta.file_path).resolve() != Path(active_path).resolve():
+                reset_tracking_session(keep_dataset_history=True)
+                return None, None, None
+        except OSError:
+            pass
+
+    if session_result.unique_track_ids:
+        sel_id = st.session_state.get("selected_track_id")
+        user_cleared = bool(st.session_state.get("_user_cleared_selection", False))
+
+        if (sel_id is None or sel_id not in session_result.unique_track_ids) and not user_cleared:
+            sel_id = max(
+                session_result.track_summaries.values(), key=lambda s: s.frames_tracked
+            ).track_id
+            activate_selected_track_id(session_result, sel_id)
+
+        sel_id = st.session_state.get("selected_track_id")
+        if sel_id is not None and sel_id in session_result.unique_track_ids:
+            mdf = st.session_state.get("movement_df")
+            msum = st.session_state.get("movement_summary")
+            needs_recompute = (
+                mdf is None
+                or mdf.empty
+                or not msum
+                or not msum.get("has_data")
+                or int(msum.get("selected_id", -1)) != int(sel_id)
+                or int(mdf["tracking_id"].iloc[0]) != int(sel_id)
+            )
+            if needs_recompute:
+                activate_selected_track_id(session_result, sel_id)
+
+    return (
+        st.session_state.get("processing_result"),
+        st.session_state.get("movement_df"),
+        st.session_state.get("movement_summary"),
+    )

@@ -34,21 +34,22 @@ from config import (
     UPLOADS_DIR,
     YOLO_MODEL_OPTIONS,
 )
-from modules.analytics import build_dataset_comparison_record, upsert_dataset_session
+from modules.analytics import (
+    activate_selected_track_id,
+    build_dataset_comparison_record,
+    upsert_dataset_session,
+)
 from modules.detection import (
     load_yolo_model_cached,
     resolve_class_filter_ids,
     save_uploaded_model,
 )
-from modules.evaluation import evaluate_tracking_performance
-from modules.movement import calculate_selected_object_movement
 from modules.tracking import (
     ByteTrackProcessor,
     FrameTrackingRecord,
     TrackingSessionResult,
     summarize_tracks,
 )
-from modules.trajectory import build_trajectory_data
 from modules.video_processor import (
     compute_bytes_hash,
     compute_file_source_id,
@@ -110,33 +111,14 @@ def _activate_selected_track_id(
     session_result: TrackingSessionResult,
     track_id: Optional[int],
     movement_threshold_px: float = DEFAULT_MOVEMENT_THRESHOLD_PX,
+    user_cleared: bool = False,
 ) -> None:
     """Compute movement, trajectory, evaluation, and comparison updates for `track_id`."""
-    st.session_state["selected_track_id"] = track_id
-    if track_id is None:
-        st.session_state["movement_df"] = None
-        st.session_state["movement_summary"] = None
-        st.session_state["trajectory_points"] = []
-        st.session_state["evaluation_result"] = evaluate_tracking_performance(
-            session_result, None, None
-        )
-    else:
-        mdf, msum = calculate_selected_object_movement(
-            session_result, track_id, movement_threshold_px=movement_threshold_px
-        )
-        traj = build_trajectory_data(mdf)
-        st.session_state["movement_df"] = mdf
-        st.session_state["movement_summary"] = msum
-        st.session_state["trajectory_points"] = traj.get("points", [])
-        st.session_state["evaluation_result"] = evaluate_tracking_performance(
-            session_result, mdf, msum
-        )
-
-    rec = build_dataset_comparison_record(
-        session_result, st.session_state.get("movement_summary")
-    )
-    st.session_state["dataset_sessions"] = upsert_dataset_session(
-        st.session_state.get("dataset_sessions", []), rec
+    activate_selected_track_id(
+        session_result,
+        track_id,
+        movement_threshold_px=movement_threshold_px,
+        user_cleared=user_cleared,
     )
 
 
@@ -157,10 +139,18 @@ def render() -> None:
         icon_name="video",
     )
 
-    # Apply pending widget reset BEFORE instantiating widgets
+    # Apply pending widget reset or restore widget selection after page navigation
     if st.session_state.pop("_pending_clear_dataset_select", False):
         st.session_state["vt_existing_select"] = DATASET_PLACEHOLDER
         st.session_state["_prev_dataset_choice"] = DATASET_PLACEHOLDER
+    elif (
+        st.session_state.get("video_source_type") == "dataset"
+        and "vt_existing_select" not in st.session_state
+    ):
+        prev_ds = st.session_state.get("_prev_dataset_choice", DATASET_PLACEHOLDER)
+        st.session_state["vt_existing_select"] = prev_ds
+
+    was_on_video_tracking = st.session_state.get("_active_rendered_page") == "Video Tracking"
 
     # ------------------------------------------------------------------
     # 1. Video Dataset Input (Independent Dataset & Upload Controls)
@@ -198,8 +188,11 @@ def render() -> None:
 
         prev_upload_id = st.session_state.get("_prev_upload_id")
         upload_changed = current_upload_id is not None and current_upload_id != prev_upload_id
+        # Only treat missing uploader file as a user click on 'X' if we stayed on Video Tracking;
+        # returning from another page unmounts st.file_uploader without clearing active video state.
         upload_cleared = (
-            uploaded_file is None
+            was_on_video_tracking
+            and uploaded_file is None
             and prev_upload_id is not None
             and st.session_state.get("video_source_type") == "upload"
         )
@@ -265,22 +258,31 @@ def render() -> None:
         active_id = st.session_state.get("video_source_id")
         if active_name and active_type:
             badge_label = "Uploaded Video" if active_type == "upload" else "Dataset Video"
-            st.markdown(
-                f"""
-                <div style="margin-top:0.35rem;padding:0.5rem 0.8rem;border-radius:8px;
-                            background:{COLORS['sidebar_bg']};border:1px solid {COLORS['borders']};
-                            display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
-                    <span style="font-size:0.86rem;color:{COLORS['main_text']};">
-                        <strong style="color:{COLORS['trajectory_accent']};">Active Input ({badge_label}):</strong>
-                        {html.escape(active_name)}
-                    </span>
-                    <span style="font-size:0.76rem;color:{COLORS['secondary_text']};font-family:monospace;">
-                        Source ID: {html.escape(str(active_id))}
-                    </span>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            info_c, clr_c = st.columns([4.2, 1])
+            with info_c:
+                st.markdown(
+                    f"""
+                    <div style="padding:0.5rem 0.8rem;border-radius:8px;
+                                background:{COLORS['sidebar_bg']};border:1px solid {COLORS['borders']};
+                                display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+                        <span style="font-size:0.86rem;color:{COLORS['main_text']};">
+                            <strong style="color:{COLORS['trajectory_accent']};">Active Input ({badge_label}):</strong>
+                            {html.escape(active_name)}
+                        </span>
+                        <span style="font-size:0.76rem;color:{COLORS['secondary_text']};font-family:monospace;">
+                            Source ID: {html.escape(str(active_id))}
+                        </span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            with clr_c:
+                if st.button("Clear Video", type="secondary", width="stretch", key="vt_clear_active_video"):
+                    _clear_active_video_source()
+                    st.session_state["_prev_upload_id"] = None
+                    st.session_state["_pending_clear_dataset_select"] = True
+                    st.session_state["_uploader_nonce"] = int(st.session_state.get("_uploader_nonce", 0)) + 1
+                    st.rerun()
 
     active_video_path = st.session_state.get("active_video_path")
     active_video_name = st.session_state.get("active_video_name")
@@ -871,7 +873,7 @@ def render() -> None:
                 st.rerun()
 
             if st.button("Clear Trajectory & Selection", type="secondary", width="stretch", key="vt_clear_sel"):
-                _activate_selected_track_id(session_result, None)
+                _activate_selected_track_id(session_result, None, user_cleared=True)
                 st.session_state["re_rendered_video_path"] = None
                 st.rerun()
 

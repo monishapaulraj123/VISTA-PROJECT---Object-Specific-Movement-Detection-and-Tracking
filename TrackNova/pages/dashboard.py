@@ -12,7 +12,11 @@ import pandas as pd
 import streamlit as st
 
 from config import COLORS, SUBTITLE, TAGLINE
-from modules.analytics import compute_dashboard_metrics, sessions_to_dataframe
+from modules.analytics import (
+    compute_dashboard_metrics,
+    sessions_to_dataframe,
+    sync_active_tracking_state,
+)
 from utils.ui import (
     render_empty_state,
     render_kpi_grid,
@@ -28,8 +32,7 @@ def render() -> None:
         icon_name="dashboard",
     )
 
-    session_result = st.session_state.get("processing_result")
-    movement_summary = st.session_state.get("movement_summary")
+    session_result, _mdf, movement_summary = sync_active_tracking_state()
     metrics = compute_dashboard_metrics(session_result, movement_summary)
 
     if not metrics["has_session"]:
